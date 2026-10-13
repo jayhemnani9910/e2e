@@ -410,6 +410,26 @@ describe('select', () => {
     );
   });
 
+  it('reports a skipped test in one shard only, the shard of the test before it', async () => {
+    const col = await collection(() => {
+      test('skipped first', { skip: true }, noop);
+      test('a', noop);
+      test('b', noop);
+      test('skipped middle', { skip: true }, noop);
+      test('c', noop);
+      test('d', noop);
+      test('skipped last', { skip: true }, noop);
+    });
+    const reported = (index: number) =>
+      select(col, config(), { shard: { index, total: 2 } })
+        .pairs.filter((pair) => pair.disposition !== 'filtered')
+        .map((pair) => pair.test.title);
+    expect([reported(1), reported(2)]).toEqual([
+      ['skipped first', 'a', 'b', 'skipped middle'],
+      ['c', 'd', 'skipped last'],
+    ]);
+  });
+
   it('brings only the setup tests a shard needs', async () => {
     const col = await collection(() => {
       test.setup('login', { sessions: ['user'] }, noop);
