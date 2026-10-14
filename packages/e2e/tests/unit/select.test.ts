@@ -420,13 +420,29 @@ describe('select', () => {
       test('d', noop);
       test('skipped last', { skip: true }, noop);
     });
-    const reported = (index: number) =>
-      select(col, config(), { shard: { index, total: 2 } })
-        .pairs.filter((pair) => pair.disposition !== 'filtered')
-        .map((pair) => pair.test.title);
-    expect([reported(1), reported(2)]).toEqual([
-      ['skipped first', 'a', 'b', 'skipped middle'],
-      ['c', 'd', 'skipped last'],
+    const shard = (index: number) =>
+      select(col, config(), { shard: { index, total: 2 } }).pairs.map((pair) => [
+        pair.test.title,
+        pair.disposition,
+        pair.skip?.cause,
+      ]);
+    expect(shard(1)).toEqual([
+      ['skipped first', 'skip', 'explicit'],
+      ['a', 'run', undefined],
+      ['b', 'run', undefined],
+      ['skipped middle', 'skip', 'explicit'],
+      ['c', 'filtered', 'filtered'],
+      ['d', 'filtered', 'filtered'],
+      ['skipped last', 'filtered', 'explicit'],
+    ]);
+    expect(shard(2)).toEqual([
+      ['skipped first', 'filtered', 'explicit'],
+      ['a', 'filtered', 'filtered'],
+      ['b', 'filtered', 'filtered'],
+      ['skipped middle', 'filtered', 'explicit'],
+      ['c', 'run', undefined],
+      ['d', 'run', undefined],
+      ['skipped last', 'skip', 'explicit'],
     ]);
   });
 
