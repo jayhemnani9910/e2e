@@ -446,6 +446,45 @@ describe('select', () => {
     ]);
   });
 
+  it('reports adjacent skips, and a skip after a filtered test, in the shard of the nearest test before it that runs', async () => {
+    const col = await collection(() => {
+      test('a', noop);
+      test('b', noop);
+      test('skipped one', { skip: true }, noop);
+      test('skipped two', { skip: true }, noop);
+      test('left out', noop);
+      test('skipped after left out', { skip: true }, noop);
+      test('c', noop);
+      test('d', noop);
+    });
+    const shard = (index: number) =>
+      select(col, config(), { grepInvert: [/^left out$/], shard: { index, total: 2 } }).pairs.map((pair) => [
+        pair.test.title,
+        pair.disposition,
+        pair.skip?.cause,
+      ]);
+    expect(shard(1)).toEqual([
+      ['a', 'run', undefined],
+      ['b', 'run', undefined],
+      ['skipped one', 'skip', 'explicit'],
+      ['skipped two', 'skip', 'explicit'],
+      ['left out', 'filtered', 'filtered'],
+      ['skipped after left out', 'skip', 'explicit'],
+      ['c', 'filtered', 'filtered'],
+      ['d', 'filtered', 'filtered'],
+    ]);
+    expect(shard(2)).toEqual([
+      ['a', 'filtered', 'filtered'],
+      ['b', 'filtered', 'filtered'],
+      ['skipped one', 'filtered', 'explicit'],
+      ['skipped two', 'filtered', 'explicit'],
+      ['left out', 'filtered', 'filtered'],
+      ['skipped after left out', 'filtered', 'explicit'],
+      ['c', 'run', undefined],
+      ['d', 'run', undefined],
+    ]);
+  });
+
   it('brings only the setup tests a shard needs', async () => {
     const col = await collection(() => {
       test.setup('login', { sessions: ['user'] }, noop);
